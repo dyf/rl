@@ -6,7 +6,7 @@ from stable_baselines3 import A2C
 class GoGame(gym.Env):
     EMPTY = 0
     BLACK = 1
-    WHITE = -1
+    WHITE = 2
     
     def __init__(self, color):
         self.color = color
@@ -17,7 +17,7 @@ class GoGame(gym.Env):
         self.board = np.zeros(self.board_shape, dtype=int)
         self.opponent_passed = False
 
-        self.observation_space = gym.spaces.Box(low=-1, high=1, shape=self.board_shape, dtype=int)
+        self.observation_space = gym.spaces.Box(low=0, high=2, shape=self.board_shape, dtype=np.uint8)
 
         self.action_space = gym.spaces.Discrete(n=self.num_actions)
 
@@ -29,7 +29,7 @@ class GoGame(gym.Env):
         )
 
     def reset(self):
-        self.board[:] = 0
+        self.board[:] = GoGame.EMPTY
         self.opponent_passed = False
         self.passed = False
 
@@ -41,13 +41,13 @@ class GoGame(gym.Env):
 
         # game over
         if is_pass and self.opponent_passed:
-            won = (self.board == self.BLACK).sum() > (self.board == self.WHITE).sum()
+            won = (self.board == GoGame.BLACK).sum() > (self.board == GoGame.WHITE).sum()
             status = 'win' if won else 'loss'
             reward = self.rewards[status] if won else self.rewards[status]
             return self.board, reward, True, False, status 
 
         # check for illegal move: already a piece there
-        if self.board[move[0],move[1]] != self.EMPTY:
+        if self.board[move[0],move[1]] != GoGame.EMPTY:
             return self.board, self.rewards['illegal'], False, False, "illegal move"
 
         # place piece
@@ -70,7 +70,7 @@ class GoGame(gym.Env):
                     [v[0] for v in group],
                     [v[1] for v in group]
                 )
-                self.board[group] = self.EMPTY
+                self.board[group] = GoGame.EMPTY
                 capture = True
                 
                 
@@ -84,7 +84,7 @@ class GoGame(gym.Env):
         
         group_color = self.board[pos[0],pos[1]]
         
-        if group_color == self.EMPTY:
+        if group_color == GoGame.EMPTY:
             return None, None, None
 
         liberties = 0
@@ -116,7 +116,7 @@ class GoGame(gym.Env):
                     ( check_pos[0], check_pos[1]+1 ),
                     ( check_pos[0], check_pos[1]-1 )
                 ])
-            elif check_color == self.EMPTY:
+            elif check_color == GoGame.EMPTY:
                 liberties += 1
 
         return group, group_color, liberties
