@@ -11,14 +11,13 @@ class GoGame(gym.Env):
     def __init__(self, color):
         self.color = color
         self.board_shape = (9,9)
+
         self.passed = False
         self.opponent_passed = False
         self.num_actions = np.prod(self.board_shape)+1
-        self.board = np.zeros(self.board_shape, dtype=int)
-        self.opponent_passed = False
-
+        self.board = np.zeros(self.board_shape, dtype=np.uint8)
+        
         self.observation_space = gym.spaces.Box(low=0, high=2, shape=self.board_shape, dtype=np.uint8)
-
         self.action_space = gym.spaces.Discrete(n=self.num_actions)
 
         self.rewards = dict(
