@@ -1,63 +1,96 @@
 import gym
 import numpy as np
-from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3 import A2C
+from stable_baselines3 import A2C, PPO
 
 class GoGame(gym.Env):
     EMPTY = 0
     BLACK = 1
-    WHITE = 2
-    
-    def __init__(self, color):
-        self.color = color
+    WHITE = -1
+
+    def __init__(self):
+        super().__init__()
+
         self.board_shape = (9,9)
 
-        self.passed = False
-        self.opponent_passed = False
+        self.white_passes = False
         self.num_actions = np.prod(self.board_shape)+1
-        self.board = np.zeros(self.board_shape, dtype=np.uint8)
+        self.board = np.zeros(self.board_shape, dtype=np.int8)
         
-        self.observation_space = gym.spaces.Box(low=0, high=2, shape=self.board_shape, dtype=np.uint8)
+        self.observation_space = gym.spaces.Box(
+            low=-1, high=1, 
+            shape=self.board_shape, 
+            dtype=np.int8)
+
         self.action_space = gym.spaces.Discrete(n=self.num_actions)
 
+        self.white_policy = self
+
         self.rewards = dict(
-            loss=-100,
+            loss=-1,
             illegal=-.1,
-            legal=0.1,
-            win=100,
+            legal=0,
+            win=1,
         )
+
+    def predict(self, obs):
+        return self.action_space.sample()
+
+    def step(self, action):
+        black_move, black_passes = self.parse_action(action)
+        info = {
+            'black_move': black_move,
+            'black_passes': black_passes,
+            'black_legal': True
+        }
+
+        # play black
+        if black_passes:
+            if self.white_passes:
+                return self.end_game(info)
+        else:
+            try:
+                self.place_stone(black_move, GoGame.BLACK)
+            except IndexError:
+                info['black_legal'] = False
+                return self.board, self.rewards['illegal'], False, info
+
+        # play white
+        for i in range(10):
+            white_action = self.white_policy.predict(-self.board)
+            white_move, self.white_passes = self.parse_action(white_action)
+
+            if self.white_passes:
+                if black_passes:
+                    return self.end_game(info)
+                else:
+                    break
+            
+            try:
+                self.place_stone(white_move, GoGame.WHITE)
+            except IndexError:
+                continue
+
+            break
+
+        info['white_passes'] = self.white_passes
+        info['white_move'] = white_move
+
+        return self.board, 1, False, info
 
     def reset(self):
         self.board[:] = GoGame.EMPTY
-        self.opponent_passed = False
-        self.passed = False
+        self.white_passes = False
+        return self.board
 
-    def step(self, action):
-        move, is_pass = self.parse_action(action)
-        print(f"{self.color} to {move}")
+    def place_stone(self, pos, color):
+        self.board[pos[0],pos[1]] = color
         
-        self.passed = is_pass
-
-        # game over
-        if is_pass and self.opponent_passed:
-            won = (self.board == GoGame.BLACK).sum() > (self.board == GoGame.WHITE).sum()
-            status = 'win' if won else 'loss'
-            reward = self.rewards[status] if won else self.rewards[status]
-            return self.board, reward, True, False, status 
-
-        # check for illegal move: already a piece there
-        if self.board[move[0],move[1]] != GoGame.EMPTY:
-            return self.board, self.rewards['illegal'], False, False, "illegal move"
-
-        # place piece
-        self.board[move[0],move[1]] = self.color
-
         positions = [
-            move,
-            ( move[0]-1, move[1] ),
-            ( move[0]+1, move[1] ),
-            ( move[0], move[1]+1 ),
-            ( move[0], move[1]-1 )
+            pos,
+            ( pos[0]-1, pos[1] ),
+            ( pos[0]+1, pos[1] ),
+            ( pos[0], pos[1]+1 ),
+            ( pos[0], pos[1]-1 )
         ]
 
         capture = False
@@ -71,17 +104,19 @@ class GoGame(gym.Env):
                 )
                 self.board[group] = GoGame.EMPTY
                 capture = True
-                
-                
 
-        return self.board, self.rewards['legal'], False, False, "capture" if capture else "legal move"
-
+    def end_game(self, info):
+        black_wins = (self.board == GoGame.BLACK).sum() > (self.board == GoGame.WHITE).sum()
+        info['winner'] = 'black' if black_wins else 'white'
+        reward = self.rewards['win'] if black_wins else self.rewards['loss']
+        return self.board, reward, True, info 
 
     def get_group(self, pos):
-        if pos[0] < 0 or pos[0] >= self.board.shape[0] or pos[1] < 0 or pos[1] >= self.board.shape[1]:
-            return None, None, None 
         
-        group_color = self.board[pos[0],pos[1]]
+        try:
+            group_color = self.board[pos[0],pos[1]]
+        except IndexError:
+            return None, None, None
         
         if group_color == GoGame.EMPTY:
             return None, None, None
@@ -128,65 +163,12 @@ class GoGame(gym.Env):
                 int(action / self.board_shape[0]),
                 int(action % self.board_shape[0])
                 ), False  
-        
-class CustomCallback(BaseCallback):
-    def __init__(self, opponent_env, verbose=0):
-        self.opponent_env = opponent_env
-        super(CustomCallback, self).__init__(verbose)
 
-    def _on_step(self) -> bool:
-        np.copyto(self.opponent_env.board, self.training_env.board)
-        self.opponent_env.opponent_passed = self.training_env.passed
-        a = self.opponent_env.action_space.sample()
-        r = e_black.step(a)
-        
-        np.copyto(self.training_env.board, self.opponent_env.board)
-        self.training_env.opponent_passed = self.training_env.passed
-        return True
-
-def main_train():
-    black_env = GoGame(color=GoGame.BLACK)
-    white_env = GoGame(color=GoGame.WHITE)
-    callback = CustomCallback(opponent_env=white_env)
-
-    model = A2C('MlpPolicy', black_env).learn(total_timesteps=1000, callback=callback)
-
-def main_test():
-    e = GoGame(color=GoGame.WHITE)
-    e.board = np.array([
-        [ 1, 1, -1, 0, 0],
-        [ 0, -1, 0, 0, 0],
-        [ 0, 0, 0, 0, 0],
-        [ 0, 0, 0, 0, 0],
-        [ 0, 0, 0, 0, 0],
-    ])
-    print(e.board)
-    e.step(5)
-    print(e.board)
-
-def main_compete():
-    e_black = GoGame(color=GoGame.BLACK)
-    e_white = GoGame(color=GoGame.WHITE)
-    e_white.reset()
-    e_black.reset()
-    is_pass = False
-
-    for i in range(5):
-        np.copyto(e_black.board, e_white.board)
-        e_black.opponent_passed = is_pass
-        a = e_black.action_space.sample()
-        _, is_pass = e_black.parse_action(a)
-        r = e_black.step(a)
-        print(e_black.board, r[4])
-
-        input("next")
-        np.copyto(e_white.board, e_black.board)
-        e_white.opponent_passed = is_pass
-        a = e_white.action_space.sample()
-        _, is_pass = e_white.parse_action(a)
-        r = e_white.step(a)
-        print(e_white.board, r[4])
-
-        input("next")
+def main():
+    from stable_baselines3.common.env_checker import check_env
+    env = GoGame()
+    check_env(env)
     
-if __name__ == "__main__": main_train()
+    model = PPO('MlpPolicy', env, verbose=1).learn(total_timesteps=1000)
+
+if __name__ == "__main__": main()
