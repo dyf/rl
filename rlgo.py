@@ -7,10 +7,10 @@ class GoGame(gym.Env):
     BLACK = 1
     WHITE = -1
 
-    def __init__(self):
+    def __init__(self, board_shape=None):
         super().__init__()
 
-        self.board_shape = (9,9)
+        self.board_shape = board_shape if board_shape else (9,9)
 
         self.white_passes = False
         self.num_actions = np.prod(self.board_shape)+1
@@ -81,6 +81,9 @@ class GoGame(gym.Env):
         self.board[:] = GoGame.EMPTY
         self.white_passes = False
         return self.board
+
+    def render(self, mode):
+        print(self.board)
 
     def place_stone(self, pos, color):
         self.board[pos[0],pos[1]] = color
@@ -165,10 +168,18 @@ class GoGame(gym.Env):
                 ), False  
 
 def main():
-    from stable_baselines3.common.env_checker import check_env
     env = GoGame()
-    check_env(env)
     
-    model = PPO('MlpPolicy', env, verbose=1).learn(total_timesteps=1000)
+    model = PPO('MlpPolicy', env, verbose=1).learn(total_timesteps=100000)
+
+    # Enjoy trained agent
+    vec_env = model.get_env()
+    obs = vec_env.reset()
+    for i in range(1000):
+        action, _states = model.predict(obs, deterministic=True)
+        obs, rewards, dones, info = vec_env.step(action)
+        vec_env.render()
+        if dones[0]:
+            break
 
 if __name__ == "__main__": main()
