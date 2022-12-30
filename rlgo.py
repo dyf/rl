@@ -86,7 +86,10 @@ class GoGame(gym.Env):
         print(self.board)
 
     def place_stone(self, pos, color):
-        self.board[pos[0],pos[1]] = color
+        if self.board[pos[0],pos[1]] != GoGame.EMPTY:
+            raise IndexError
+
+        self.board[pos[0],pos[1]] = color  
         
         positions = [
             pos,
@@ -111,6 +114,7 @@ class GoGame(gym.Env):
     def end_game(self, info):
         black_wins = (self.board == GoGame.BLACK).sum() > (self.board == GoGame.WHITE).sum()
         info['winner'] = 'black' if black_wins else 'white'
+        print(f"{info['winner']} wins")
         reward = self.rewards['win'] if black_wins else self.rewards['loss']
         return self.board, reward, True, info 
 
@@ -167,8 +171,8 @@ class GoGame(gym.Env):
                 int(action % self.board_shape[0])
                 ), False  
 
-def main():
-    env = GoGame()
+def train():
+    env = GoGame(board_shape=(5,5))
     
     model = PPO('MlpPolicy', env, verbose=1).learn(total_timesteps=100000)
 
@@ -176,10 +180,22 @@ def main():
     vec_env = model.get_env()
     obs = vec_env.reset()
     for i in range(1000):
-        action, _states = model.predict(obs, deterministic=True)
+        action, _states = model.predict(obs)
         obs, rewards, dones, info = vec_env.step(action)
         vec_env.render()
         if dones[0]:
             break
+        print(info)
+        input()
 
-if __name__ == "__main__": main()
+def manual_test():
+    env = GoGame(board_shape=(5,5))
+    for i in range(100):
+        a = env.action_space.sample()
+        _,_,_,info = env.step(a)
+        print(env.board)
+        print(info)
+        input()
+
+if __name__ == "__main__": 
+    train()
