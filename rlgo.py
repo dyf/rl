@@ -27,13 +27,13 @@ class GoGame(gym.Env):
 
         self.rewards = dict(
             loss=-1,
-            illegal=-.1,
+            illegal=-.01,
             legal=0,
-            win=1,
+            win=100,
         )
 
     def predict(self, obs):
-        return self.action_space.sample()
+        return self.action_space.sample(), None
 
     def step(self, action):
         black_move, black_passes = self.parse_action(action)
@@ -56,7 +56,7 @@ class GoGame(gym.Env):
 
         # play white
         for i in range(10):
-            white_action = self.white_policy.predict(-self.board)
+            white_action = self.white_policy.predict(-self.board)[0]
             white_move, self.white_passes = self.parse_action(white_action)
 
             if self.white_passes:
@@ -75,7 +75,7 @@ class GoGame(gym.Env):
         info['white_passes'] = self.white_passes
         info['white_move'] = white_move
 
-        return self.board, 1, False, info
+        return self.board, self.rewards['legal'], False, info
 
     def reset(self):
         self.board[:] = GoGame.EMPTY
@@ -172,21 +172,22 @@ class GoGame(gym.Env):
                 ), False  
 
 def train():
-    env = GoGame(board_shape=(5,5))
+    env = GoGame(board_shape=(9,9))
     
-    model = PPO('MlpPolicy', env, verbose=1).learn(total_timesteps=100000)
+    model = PPO('MlpPolicy', env, verbose=1)
+    model.learn(total_timesteps=int(1e5))
+    model.save('go-1')
+    
+    env.white_policy = PPO.load('go-1')
+    model.learn(total_timesteps=int(1e5))
+    model.save('go-2')
 
-    # Enjoy trained agent
-    vec_env = model.get_env()
-    obs = vec_env.reset()
-    for i in range(1000):
-        action, _states = model.predict(obs)
-        obs, rewards, dones, info = vec_env.step(action)
-        vec_env.render()
-        if dones[0]:
-            break
-        print(info)
-        input()
+    env.white_policy = PPO.load('go-2')
+    model.learn(total_timesteps=int(1e5))
+    model.save('go-3')
+
+
+    
 
 def manual_test():
     env = GoGame(board_shape=(5,5))
