@@ -92,7 +92,6 @@ class Go:
         return valid 
 
     def place_stone(self, pos, color, commit=True):
-        print(f"placing {color} on {pos}")
 
         if self.is_occupied(pos):
             raise OccupiedSpaceError()
@@ -127,7 +126,6 @@ class Go:
                 if pos in g.positions:
                     raise SelfCaptureError()
 
-                print(f"removing {g}")
                 x = (
                     [v[0] for v in g.positions],
                     [v[1] for v in g.positions]
@@ -137,8 +135,6 @@ class Go:
                     if og is not g:
                         for p in g.positions:
                             og.add_liberty(p, board)
-                for og in all_groups:
-                    print(og)
             else:
                 remaining_groups.append(g)
         
