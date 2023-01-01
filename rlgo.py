@@ -1,6 +1,9 @@
 import gym
 import numpy as np
 from stable_baselines3 import A2C, PPO
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.monitor import Monitor
+import torch as th
 
 class OccupiedSpaceError(Exception): pass
 class SelfCaptureError(Exception): pass
@@ -31,10 +34,10 @@ class GoGame(gym.Env):
         self.white_policy = self
 
         self.rewards = dict(
-            loss=-1,
+            loss=-100,
             illegal=-.1,
-            legal=0,
-            win=1,
+            legal=.1,
+            win=100,
         )
        
     
@@ -63,12 +66,13 @@ class GoGame(gym.Env):
         else:
             try:
                 self.place_stone(black_move, GoGame.BLACK)
-            except (OccupiedSpaceError, SelfCaptureError) as e:
+            except (OccupiedSpaceError, SelfCaptureError, KoError) as e:
                 info['black_legal'] = e.__class__.__name__
                 return self.board, self.rewards['illegal'], False, info
 
-        # play white
-        for i in range(10):
+        # play white 
+        num_white_tries = 1000
+        for i in range(num_white_tries):
             white_action = self.white_policy.predict(-self.board)[0]
             white_move, self.white_passes = self.parse_action(white_action)
 
@@ -79,8 +83,8 @@ class GoGame(gym.Env):
                     break
             
             try:
-                self.place_stone(white_move, GoGame.WHITE)
-            except (OccupiedSpaceError, SelfCaptureError) as e:
+                self.place_stone(white_move, GoGame.WHITE)                
+            except (OccupiedSpaceError, SelfCaptureError, KoError) as e:
                 continue
 
             break
@@ -196,9 +200,16 @@ class GoGame(gym.Env):
                 ), False  
 
 def train():
-    env = GoGame(board_shape=(9,9))
+    def make_env():
+        return Monitor(GoGame(board_shape=(9,9)))
+
+    num_cpu = 4  # Number of processes to use
+    env = SubprocVecEnv([make_env for i in range(num_cpu)])
+
+    policy_kwargs = dict(activation_fn=th.nn.ReLU,
+                         net_arch=[dict(pi=[128,128,128], vf=[128,128,128])])
     
-    model = PPO('MlpPolicy', env, verbose=1)
+    model = PPO('MlpPolicy', env, policy_kwargs=policy_kwargs, verbose=1)
     model.learn(total_timesteps=int(1e6))
     model.save('go-1')
     
@@ -251,7 +262,7 @@ def test_ko():
     env.render(mode=1)
     
 if __name__ == "__main__": 
-    manual_test()
+    #manual_test()
     #manual_eval()
     #test_ko()
-    #train()
+    train()
