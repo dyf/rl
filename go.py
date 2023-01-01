@@ -121,7 +121,6 @@ class Go:
         # check for capture
         remaining_groups = []
         for g in all_groups:
-            # assuming self-capture ruled out
             if len(g.liberties) == 0:
                 if pos in g.positions:
                     raise SelfCaptureError()
