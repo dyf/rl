@@ -22,7 +22,7 @@ class StoneGroup:
         self.positions.add(pos)
         self.liberties.discard(pos)
 
-        for n in neighbors(pos, board):
+        for n in neighbors(pos, board):            
             if board[n[0],n[1]] == Go.EMPTY:
                 self.liberties.add(n)
     
@@ -33,6 +33,12 @@ class StoneGroup:
         for p in self.positions:
             if pos in neighbors(p, board):
                 self.liberties.add(pos)
+
+    def copy(self):
+        g = StoneGroup(color=self.color)
+        g.positions = self.positions.copy()
+        g.liberties = self.liberties.copy()
+        return g
 
     def __str__(self):
         return f"color:{self.color} pos:{self.positions} lib:{self.liberties}"
@@ -83,7 +89,7 @@ class Go:
         for x in it:
             pos = (it.multi_index[0], it.multi_index[1])
 
-            try:
+            try:                
                 self.place_stone(pos, color, commit=False)
                 valid.add(pos)
             except (OccupiedSpaceError, SelfCaptureError, KoError) as e:
@@ -103,7 +109,8 @@ class Go:
         all_groups = []
         merge_groups = []
 
-        for g in self.stone_groups:            
+        for g in self.stone_groups:
+            g = g.copy()
             if g.color == color and pos in g.liberties: # adding stone to existing group
                 g.add_stone(pos, board)
                 merge_groups.append(g)
@@ -117,7 +124,7 @@ class Go:
             all_groups.append(g)
         else:        
             all_groups.append(StoneGroup.merge(merge_groups))
-        
+
         # check for capture
         remaining_groups = []
         for g in all_groups:
@@ -198,5 +205,11 @@ def test_occupied():
     g.place_stone((1,1), Go.BLACK)
     g.place_stone((1,1), Go.WHITE)
 
+def test_valid():
+    g = Go(board_shape=(3,3))
+    g.place_stone((0,0), Go.BLACK)    
+    print("checking")
+    print(g.all_valid_positions(Go.BLACK))
+
 if __name__ == "__main__":
-    test_occupied()
+    test_valid()
