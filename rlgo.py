@@ -6,7 +6,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.monitor import Monitor
 import torch as th
 
-class GoGame(gym.Env):
+class GoEnv(gym.Env):
     EMPTY = 0
     BLACK = 1
     WHITE = -1
@@ -112,7 +112,7 @@ class GoGame(gym.Env):
 
 def train():
     def make_env():
-        return Monitor(GoGame(board_shape=(9,9)))
+        return Monitor(GoEnv(board_shape=(9,9)))
 
     num_cpu = 4  # Number of processes to use
     env = SubprocVecEnv([make_env for i in range(num_cpu)])
@@ -136,7 +136,7 @@ def train():
     
 
 def manual_test():
-    env = GoGame(board_shape=(5,5))
+    env = GoEnv(board_shape=(5,5))
     for i in range(100):
         a = env.action_space.sample()
         _,_,_,info = env.step(a)
@@ -145,7 +145,7 @@ def manual_test():
         input()
 
 def manual_eval():
-    env = GoGame(board_shape=(9,9))
+    env = GoEnv(board_shape=(9,9))
     model = PPO.load('go-2')
 
     for i in range(100):
@@ -156,7 +156,7 @@ def manual_eval():
         input()
 
 def test_ko():
-    env = GoGame(board_shape=(5,5))
+    env = GoEnv(board_shape=(5,5))
     env.board = np.array([
         [ 0,  0,  0,  0,  0],
         [ 0,  1, -1,  0,  0],
@@ -167,9 +167,9 @@ def test_ko():
 
     env.render(mode=1)
 
-    env.place_stone((2,1), GoGame.WHITE)
+    env.place_stone((2,1), GoEnv.WHITE)
     env.render(mode=1)
-    env.place_stone((2,2), GoGame.BLACK)
+    env.place_stone((2,2), GoEnv.BLACK)
     env.render(mode=1)
     
 if __name__ == "__main__": 
