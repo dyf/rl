@@ -37,15 +37,15 @@ def train():
     
 
     model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1, policy_kwargs=policy_kwargs)
-    model.learn(total_timesteps=int(1e6))
+    model.learn(total_timesteps=int(1e5))
     model.save('mpgo-1')
 
-    env.white_policy = PPO.load('mpgo-1')
-    model.learn(total_timesteps=int(1e6))
+    env.set_white_policy(MaskablePPO.load('mpgo-1'))
+    model.learn(total_timesteps=int(1e5))
     model.save('mpgo-2')
 
-    env.white_policy = PPO.load('mpgo-2')
-    model.learn(total_timesteps=int(1e6))
+    env.set_white_policy(MaskablePPO.load('mpgo-2'))
+    model.learn(total_timesteps=int(1e5))
     model.save('mpgo-3')
 
 if __name__ == "__main__": train()

@@ -34,6 +34,9 @@ class GoEnv(gym.Env):
             legal=.1,
             win=100,
         )
+
+    def set_white_policy(self, policy):
+        self.white_policy = policy
        
     def predict(self, obs):
         return self.action_space.sample(), None
@@ -59,7 +62,7 @@ class GoEnv(gym.Env):
 
         # play white 
         num_white_tries = 1000
-        for i in range(num_white_tries):
+        for i in range(num_white_tries):            
             white_action = self.white_policy.predict(-self.game.board)[0]
             white_move, self.white_passes = self.parse_action(white_action)
 
